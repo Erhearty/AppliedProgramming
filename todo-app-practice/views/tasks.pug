@@ -4,10 +4,90 @@ block title
   title Список задач
 
 block content
-  ul
+  form#addForm
+    input#titleInput(type="text" name="title" placeholder="Введіть назву задачі" required minlength="3" maxlength="100")
+    button(type="submit") Додати
+
+  hr
+
+  ul#tasksList
     each task in tasks
-      li
+      li(data-id=task.id)
         if task.completed
           del #{task.title} (Виконано)
         else
           | #{task.title}
+        |  &nbsp;
+        button.btn-toggle(data-id=task.id) Toggle
+        button.btn-delete(data-id=task.id) Delete
+
+  script.
+    const notyf = new Notyf();
+    const form = document.getElementById('addForm');
+    const titleInput = document.getElementById('titleInput');
+    const tasksList = document.getElementById('tasksList');
+
+    async function handleFetch(url, options) {
+      try {
+        const res = await fetch(url, options);
+        let data = {};
+        try { data = await res.json(); } catch {}
+
+        if (res.status >= 200 && res.status < 300) {
+          notyf.success(data.message || 'Успішно');
+          return data;
+        } else {
+          notyf.error(data.error || `Помилка ${res.status}`);
+          return null;
+        }
+      } catch (err) {
+        notyf.error('Помилка мережі');
+        return null;
+      }
+    }
+
+    // Додавання задачі
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title = titleInput.value.trim();
+      if (!title) return;
+
+      const data = await handleFetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title })
+      });
+
+      if (data) {
+        // додати в DOM
+        const t = data.task;
+        const li = document.createElement('li');
+        li.dataset.id = t.id;
+        li.innerHTML = `${t.title} &nbsp; 
+          <button class="btn-toggle" data-id="${t.id}">Toggle</button> 
+          <button class="btn-delete" data-id="${t.id}">Delete</button>`;
+        tasksList.appendChild(li);
+        titleInput.value = '';
+      }
+    });
+
+    // Toggle і Delete
+    tasksList.addEventListener('click', async (e) => {
+      const target = e.target;
+      const id = target.dataset.id;
+
+      if (!id) return;
+
+      // Toggle
+      if (target.classList.contains('btn-toggle')) {
+        const data = await handleFetch(`/api/tasks/${id}`, { method: 'PUT' });
+        setTimeout(() => location.reload(), 500);
+      }
+
+      // Delete
+      if (target.classList.contains('btn-delete')) {
+        if (!confirm('Видалити задачу?')) return;
+        const data = await handleFetch(`/api/tasks/${id}`, { method: 'DELETE' });
+        if (data) target.closest('li').remove();
+      }
+    });
