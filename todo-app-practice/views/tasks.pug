@@ -1,0 +1,13 @@
+extends layout
+
+block title
+  title Список задач
+
+block content
+  ul
+    each task in tasks
+      li
+        if task.completed
+          del #{task.title} (Виконано)
+        else
+          | #{task.title}
