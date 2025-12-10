@@ -4,6 +4,7 @@ block title
   title Список задач
 
 block content
+  h2 Ваші задачі
   form#addForm
     input#titleInput(type="text" name="title" placeholder="Введіть назву задачі" required minlength="3" maxlength="100")
     button(type="submit") Додати
@@ -11,25 +12,59 @@ block content
   hr
 
   ul#tasksList
-    each task in tasks
-      li(data-id=task.id)
-        if task.completed
-          del #{task.title} (Виконано)
-        else
-          | #{task.title}
-        |  &nbsp;
-        button.btn-toggle(data-id=task.id) Toggle
-        button.btn-delete(data-id=task.id) Delete
 
   script.
     const notyf = new Notyf();
-    const form = document.getElementById('addForm');
-    const titleInput = document.getElementById('titleInput');
-    const tasksList = document.getElementById('tasksList');
+    // Перевіряємо токен
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = '/login';
+    }
 
-    async function handleFetch(url, options) {
+    // Load tasks
+    async function loadTasks() {
+      const res = await fetch('/api/tasks', {
+        headers: {
+          'Authorization': 'Bearer ' + token
+        }
+      });
+
+      if (!res.ok) {
+        notyf.error("Необхідний вхід");
+        setTimeout(() => window.location.href = '/login', 800);
+        return;
+      }
+
+      const tasks = await res.json();
+
+      const list = document.getElementById('tasksList');
+      list.innerHTML = "";
+
+      tasks.forEach(t => {
+        const li = document.createElement('li');
+        li.dataset.id = t._id;
+
+        li.innerHTML = `
+          ${t.completed ? `<del>${t.title}</del>` : t.title}
+          &nbsp;
+          <button class="btn-toggle" data-id="${t._id}">Toggle</button>
+          <button class="btn-delete" data-id="${t._id}">Delete</button>
+        `;
+
+        list.appendChild(li);
+      });
+    }
+
+    loadTasks();
+
+    async function handleFetch(url, options = {}) {
+      options.headers ??= {};
+      options.headers['Content-Type'] = 'application/json';
+      options.headers['Authorization'] = 'Bearer ' + token;
+
       try {
         const res = await fetch(url, options);
+
         let data = {};
         try { data = await res.json(); } catch {}
 
@@ -41,12 +76,16 @@ block content
           return null;
         }
       } catch (err) {
-        notyf.error('Помилка мережі');
+        notyf.error("Помилка мережі");
         return null;
       }
     }
 
     // Додавання задачі
+    const form = document.getElementById('addForm');
+    const titleInput = document.getElementById('titleInput');
+    const tasksList = document.getElementById('tasksList');
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const title = titleInput.value.trim();
@@ -54,19 +93,11 @@ block content
 
       const data = await handleFetch('/api/tasks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title })
       });
 
       if (data) {
-        // додати в DOM
-        const t = data.task;
-        const li = document.createElement('li');
-        li.dataset.id = t.id;
-        li.innerHTML = `${t.title} &nbsp; 
-          <button class="btn-toggle" data-id="${t.id}">Toggle</button> 
-          <button class="btn-delete" data-id="${t.id}">Delete</button>`;
-        tasksList.appendChild(li);
+        loadTasks();
         titleInput.value = '';
       }
     });
@@ -80,14 +111,17 @@ block content
 
       // Toggle
       if (target.classList.contains('btn-toggle')) {
-        const data = await handleFetch(`/api/tasks/${id}`, { method: 'PUT' });
-        setTimeout(() => location.reload(), 500);
+        await handleFetch(`/api/tasks/${id}`, { method: 'PUT' });
+        loadTasks();
       }
 
       // Delete
       if (target.classList.contains('btn-delete')) {
         if (!confirm('Видалити задачу?')) return;
+
         const data = await handleFetch(`/api/tasks/${id}`, { method: 'DELETE' });
-        if (data) target.closest('li').remove();
+        if (data) {
+          loadTasks();
+        }
       }
     });

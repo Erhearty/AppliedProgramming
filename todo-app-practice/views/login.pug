@@ -1,0 +1,104 @@
+doctype html
+html
+  head
+    meta(charset="utf-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1")
+    title Login
+    link(rel="stylesheet" href="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.css")
+    script(src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js")
+  body
+    h1 Вхід
+
+    form#loginForm
+      input#email(type="email" placeholder="Email" required)
+      br
+      input#password(type="password" placeholder="Пароль" required)
+      br
+      button#loginBtn(type="submit") Увійти
+      button#registerBtn(type="button") Зареєструватися
+
+
+    script.
+      const notyf = new Notyf();
+
+      const form = document.getElementById('loginForm');
+      const emailInput = document.getElementById('email');
+      const passInput = document.getElementById('password');
+
+      const loginBtn = document.getElementById('loginBtn');
+      loginBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+
+        const email = emailInput.value.trim();
+        const password = passInput.value.trim();
+        
+        if (!email || !password) {
+          notyf.error("Заповніть всі поля");
+          return;
+        }
+
+        try {
+          const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            notyf.error(data.error || "Помилка логіна");
+            return;
+          }
+
+          // Зберігаємо токен
+          localStorage.setItem('token', data.token);
+
+          notyf.success("Успішний вхід!");
+
+          // Редірект на tasks
+          setTimeout(() => {
+            window.location.href = '/tasks';
+          }, 500);
+
+        } catch (err) {
+          notyf.error("Помилка сервера");
+        }
+      });
+
+      const registerBtn = document.getElementById('registerBtn');
+      registerBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+
+        const email = emailInput.value.trim();
+        const password = passInput.value.trim();
+
+        if (!email || !password) {
+          notyf.error("Заповніть всі поля");
+          return;
+        }
+
+        try {
+          const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            notyf.error(data.error || "Помилка створення нового акаунта");
+            return;
+          }
+          localStorage.setItem('token', data.token);
+
+          notyf.success("Успішний вхід!");
+          setTimeout(() => {
+            window.location.href = '/tasks';
+          }, 500);
+
+        } catch (err) {
+          notyf.error("Помилка сервера");
+        }
+      });
